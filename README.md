@@ -1,6 +1,6 @@
-# Species Distribution Modeling (SDM) Maps
+# Ecological Niche Modeling (SDM) Maps
 
-This repository includes a script (`sdm_maps.py`) that builds simple species distribution models (SDMs) using presence data and environmental rasters, then generates habitat suitability maps.
+This repository includes a script (`run_models.py`) that builds simple Ecological Niche Models (ENM) using presence data and environmental rasters, then generates habitat suitability maps.
 
 ## What it does
 - Loads presence records (GBIF + local cleaned data).
@@ -25,15 +25,15 @@ This repository includes a script (`sdm_maps.py`) that builds simple species dis
 
 ## Outputs
 - Model bundles (calibrated models, scalers, metadata): `models/`
-- Prediction maps, ensemble means, uncertainty and metrics: `output/{REGION}/{period}/{scenario}/` (see `sdm_maps.py` for exact filenames)
+- Prediction maps, ensemble means, uncertainty and metrics: `output/{REGION}/{period}/{scenario}/` (see `run_models.py` for exact filenames)
 
 ## Running
 ```bash
 # Calibrate models (train on 1981-2010 using recent occurrences)
-python sdm_maps.py --mode calibrate
+python run_models.py --mode calibrate
 
 # Predict using pre-calibrated models for a scenario (e.g., ssp585)
-python sdm_maps.py --mode predict --scenario ssp585
+python run_models.py --mode predict --scenario ssp585
 ```
 
 ## Notes

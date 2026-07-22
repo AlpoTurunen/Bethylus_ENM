@@ -38,7 +38,7 @@ All environmental rasters are aligned to the reference CHELSA grid. This ensures
 
 ## 3. Ecological Niche Modelling Pipeline
 
-The main modelling workflow is implemented in `sdm_maps.py`, which contains two distinct operation modes:
+The main modelling workflow is implemented in `run_models.py`, which contains two distinct operation modes:
 
 - `calibrate_mode(args)`
 - `predict_mode(args)`
