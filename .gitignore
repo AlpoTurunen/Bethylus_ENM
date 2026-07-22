@@ -1,0 +1,9 @@
+*.txt
+images/
+output/
+__pycache__/
+cleaned_env_data/
+data/
+GOaS_v1_20211214_gpkg
+mean_rasters/
+models/
