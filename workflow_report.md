@@ -9,7 +9,7 @@ The workflow begins by downloading CHELSA climate data for a historical baseline
 - Future scenarios: `ssp126` and `ssp585`.
 - General models: `UKESM1-0-LL`, `MPI-ESM1-2-HR`, and `IPSL-CM6A-LR`, which are all European models.
 
-This download stage produces one raster file per variable, scenario, and GCM (Global Climate Model) realization, ensuring that the same predictor set is available for both calibration and projection. This phase can take up to tens of gigabytes of storage temporarily.
+This download stage produces one raster file per variable, scenario, and GCM (Global Climate Model) realization, ensuring that the same predictor set is available for both calibration and projection. This phase can take up to a few hours and tens of gigabytes of storage (temporarily).
 
 
 ## 2. Raster Processing
@@ -50,34 +50,51 @@ In calibration mode, models are trained using contemporary species observations 
 #### Observation data
 
 - Presence records are loaded from `data/bethylus_fuscicornis_gbif.gpkg` and `data/bethylus_fuscicornis_local.gpkg`. First one is downloaded from Global Biodiversity Information Facility (GBIF) and another one was the local Excel datasheet converted to a GeoPackage. Both files have been cleaned to contain similar structure and columns.
-- Records are merged into a single GeoDataFrame of recent observations.
+- Records are merged into a single GeoDataFrame of recent observations. In total 1551 occurrences, of which we removed overlapping ones using ~10 km buffer.
 
 #### Environmental predictors
 
-- Predictor variables include bioclimatic variables `bio01`–`bio19` plus `gdd5`.
-- Predictor layers are loaded into a stack and filtered for collinearity.
-- Variable selection uses correlation and variance inflation factor (VIF) thresholds to remove redundant predictors.
+- Predictor variables include CHELSA bioclim bioclimatic variables `bio01`–`bio19` plus `gdd5`, which were loaded into a stack and filtered for collinearity.
+- Variable selection uses correlation and variance inflation factor (VIF) thresholds (0.8 and 10, respectively) to remove redundant predictors. Final predictors used for modelling: **`bio01`, `bio02`, `bio07`, `bio08`, `bio12`, `bio15`**
+- Predictors and observations were clipped by the study extent (Northern European area):
+    - Left (min lon): **-10.000**
+    - Bottom (min lat): **45.000**
+    - Right (max lon): **35.000**
+    - Top (max lat): **70.000**
 
 #### Model training
 
 - The workflow performs three independent calibration runs with different random seeds (`42`, `123`, `456`).
 - Each run includes spatial thinning of presence records to reduce spatial bias and adaptive background sampling to produce pseudo-absence points.
+    - Spatial thinning is implemented using a regular grid of 0.05° cells (approximately 5 km at the equator), keeping at most one presence record per cell. This reduces oversampling in dense observation clusters. In total 555 occurrences were retained.
+    - Adaptive background sampling selects background locations based on geographic structure around presence records, rather than sampling randomly across the entire study area. This reduces sampling bias and improves the comparability of presence and background data. In total 5000 pseudo-background observations were generated.
 - Data are split into training and test sets using an approximate 80% training / 20% test split.
-- Multiple algorithms (LogisticRegression, RandomForestClassifier, SVC (Support Vector Machine) and GradientBoostingClassifier) are trained and evaluated using stratified 5-fold cross-validation on the training set.
+- Multiple algorithms are trained and evaluated using stratified 5-fold cross-validation on the training set:
+    - `LogisticRegression` (max_iter=1000, class_weight='balanced')
+    - `RandomForestClassifier` (n_estimators=100, max_depth=15, class_weight='balanced')
+    - `SVC` (RBF kernel, probability=True, class_weight='balanced')
+    - `GradientBoostingClassifier` (n_estimators=100, max_depth=5)
 
 #### Ensemble creation
 
 - Model outputs are combined into an ensemble using a weighted average of algorithm predictions.
 - Ensemble weights are derived from model performance metrics such as TSS.
-- The pipeline computes mean and standard deviation suitability maps across the three calibration runs.
+- The pipeline computes mean maps across the three calibration runs.
 
 #### Performance metrics
 
-The calibration phase reports the following metrics:
+The calibration phase reports the following metrics: True Skill Statistic (TSS), Area Under the Receiver Operating Characteristic Curve (AUC), and Area Under the Precision-Recall Curve (AUC-PR).
 
-- True Skill Statistic (TSS)
-- Area Under the Receiver Operating Characteristic Curve (AUC)
-- Area Under the Precision-Recall Curve (AUC-PR)
+- Cross-validation and test-set performance (summary across 3 runs):
+    - Cross-validation (5-fold on training set):
+        - Mean TSS: **0.692 ± 0.043**
+        - Mean AUC: **0.920 ± 0.014**
+        - Mean AUC-PR: **0.587 ± 0.060**
+    - Held-out test set (mean across runs, threshold=0.20):
+        - Mean TSS: **0.652**
+        - Mean AUC: **0.915**
+        - Mean AUC-PR: **0.547**
+
 
 These metrics are computed for cross-validation folds and for held-out test data.
 
@@ -86,7 +103,6 @@ These metrics are computed for cross-validation folds and for held-out test data
 Calibration outputs include:
 
 - ensemble mean suitability raster
-- ensemble standard deviation raster
 - JSON summary of metrics
 - PNG figure of ensemble mean suitability
 
@@ -100,7 +116,7 @@ In prediction mode, the workflow loads calibrated models and applies them to fut
 
 - Future environmental rasters for 2071–2100 are loaded from mean scenario-specific layers.
 - The same predictor variables and variable order used during calibration are preserved.
-- The previously saved `StandardScaler` is reused to scale predictor values consistently.
+- The previously saved `StandardScaler` is reused to scale predictor values consistently. The scaler was fitted only using historical calibration data and reused unchanged during future projection.
 
 #### Model application
 
@@ -122,7 +138,7 @@ The workflow follows a best-practice principle: calibrate models on contemporane
 
 - Multiple GCMs per scenario are averaged to reduce noise in future predictor fields.
 - Multiple model runs quantify variability in the calibration phase.
-- Ensemble mean and standard deviation maps provide measures of predicted suitability and projection uncertainty.
+- Ensemble mean maps provide measures of predicted suitability and projection uncertainty.
 
 ### 4.3 Reproducibility
 
@@ -130,10 +146,9 @@ The workflow follows a best-practice principle: calibrate models on contemporane
 - Raster metadata are preserved when writing outputs.
 - Model artifacts and metric summaries are stored in structured output directories.
 
-## 5. Summary
+## 6. Summary
 
 This workflow provides a complete pipeline from raw CHELSA climate data through raster preprocessing, spatial masking, model calibration, and future projection. It is suitable for research that requires reproducible species ecological niche models constrained by historical calibration and scenario-based climate projections. It is possible to use this same model for different species.
-
 
 ## References:
 Flanders Marine Institute (2021). Global Oceans and Seas, version 1. Available online at https://www.marineregions.org/. https://doi.org/10.14284/542.
